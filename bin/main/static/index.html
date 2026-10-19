@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Local AI Agent</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<header><div class="brand"><span class="mark">◈</span><div><strong>Local AI Agent</strong><small>Ollama · Spring Boot · Local workspace</small></div></div><div class="header-right"><span id="connection" class="status">Checking Ollama…</span><span id="taskStatus" class="status muted">Idle</span></div></header>
+<main id="layout">
+<aside class="panel side">
+<h2>Model controls</h2><label for="model">Ollama model</label><div class="row"><select id="model"><option value="">Choose a model…</option></select><button id="refresh" title="Refresh models">↻</button></div>
+<label for="sort">Sort models</label><select id="sort"><option value="name-asc">Name · ascending</option><option value="name-desc">Name · descending</option><option value="size-asc">Size · smallest first</option><option value="size-desc">Size · largest first</option></select>
+<div id="modelInfo" class="muted mini">No model selected. Nothing is loaded automatically.</div>
+<label for="ctx">Context size <output id="ctxValue">4096</output></label><input type="range" id="ctx" min="1024" max="8192" step="1024" value="4096">
+<label class="toggle"><input id="writes" type="checkbox"> Allow writing generated files</label><p class="mini muted">Unchecked: preview only. Check this to write into the local workspace. Generated code is not executed automatically.</p>
+<div class="divider"></div><h2>Workspace</h2><div id="workspace" class="mini path">Loading…</div>
+<div class="divider"></div><h2>How it works</h2><p class="mini muted">Plan → fresh request per step → structured JSON files → compact memory. No native Ollama tool calling needed.</p>
+</aside><div class="resizer" id="r1"></div>
+<section class="panel center"><div class="panel-header"><h2>Task & plan</h2><span class="mini muted">Structured steps</span></div>
+<div class="prompt-area"><label for="prompt">What should the agent build?</label><textarea id="prompt" spellcheck="false" placeholder="Example: Build a small Java 17 Spring Boot CRUD application with REST endpoints, validation, and unit tests. Create separate source files with correct package structure."></textarea><div class="buttons"><button class="primary" id="start">▶ Plan & execute</button><button class="danger" id="stop" disabled>■ Stop</button><button id="clear">Clear view</button></div></div>
+<div class="divider"></div><div class="panel-header"><h2>Execution plan</h2><span id="progress" class="mini muted">Not started</span></div><ol id="steps"><li class="placeholder">Your plan will appear as soon as the model finishes planning.</li></ol>
+<div class="footer-note mini muted">Each step runs as a new LLM request. Only brief summaries and relevant workspace files are passed onward.</div>
+</section><div class="resizer" id="r2"></div>
+<section class="panel right"><div class="panel-header"><h2>Live output</h2><button id="clearOutput">Clear output</button></div><div id="events" role="log" aria-live="polite"><div class="empty">Ollama tokens and execution logs will stream here in real time.</div></div><div class="bottom"><span id="eventCount">0 events</span><span>Local only · 127.0.0.1</span></div></section>
+</main><script src="/app.js"></script></body></html>

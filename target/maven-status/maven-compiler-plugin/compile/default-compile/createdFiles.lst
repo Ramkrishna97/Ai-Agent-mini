@@ -1,0 +1,13 @@
+com\example\aiagentlocal\dev\OllamaClient.class
+com\example\aiagentlocal\dev\AgentService$ChatSession.class
+com\example\aiagentlocal\dev\AgentService$Step.class
+com\example\aiagentlocal\dev\AgentService$Run.class
+com\example\aiagentlocal\dev\AttachmentService$Attachment.class
+com\example\aiagentlocal\dev\AttachmentService.class
+com\example\aiagentlocal\dev\AgentService$StartRequest.class
+com\example\aiagentlocal\dev\ApiController.class
+com\example\aiagentlocal\AiAgentLocalApplication.class
+com\example\aiagentlocal\dev\OllamaReply.class
+com\example\aiagentlocal\dev\AgentService.class
+com\example\aiagentlocal\dev\LocalAgentApplication.class
+com\example\aiagentlocal\dev\TaskMetrics.class
