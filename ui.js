@@ -678,14 +678,20 @@ function renderGeneration(data) {
     viewerPreference = null;
   }
   const elapsed = generation.started_at ? Math.max(0, Math.floor(Date.now() / 1000 - generation.started_at)) : 0;
-  const phase = {loading: 'Loading model', ready: 'Model loaded', generating: 'Generating', generated: 'Response complete'}[generation.phase] || generation.phase;
+  const phase = {loading: 'Loading model', ready: 'Model loaded', generating: 'Generating',
+    tool: running ? 'Using tools' : 'Response complete',
+    generated: running ? 'Model turn complete' : 'Response complete'}[generation.phase] || generation.phase;
   const count = generation.generated_tokens ? ` · ${generation.generated_tokens} tokens` : '';
-  $('#generation-phase').textContent = `${phase}: ${generation.model}${count} · ${elapsed}s`;
+  const activity = generation.phase === 'tool' && generation.activity ? ` · ${generation.activity}` : '';
+  $('#generation-phase').textContent = `${phase}: ${generation.model}${count} · ${elapsed}s${activity}`;
   $('#generation-target').textContent = target;
-  const state = generation.phase === 'generating' ? 'streaming' : generation.phase === 'generated' ? 'complete' : 'waiting';
+  const state = !running && ['generated', 'tool'].includes(generation.phase) ? 'complete' :
+    generation.phase === 'tool' ? 'working' : generation.phase === 'generating' ? 'streaming' : 'waiting';
   $('#generation-state').dataset.state = state;
-  $('#generation-state').textContent = {streaming: '● Streaming', complete: 'Complete', waiting: 'Waiting'}[state];
-  const text = generation.text || 'Waiting for the model to produce its first token…';
+  $('#generation-state').textContent = {streaming: '● Streaming', working: 'Working', complete: 'Complete', waiting: 'Waiting'}[state];
+  const text = generation.text || generation.activity ||
+    (generation.phase === 'generated' ? 'Processing the model response…' :
+      'Waiting for the model to produce its first token…');
   showOutput(text, target);
 }
 

@@ -22,7 +22,9 @@ class FakeLlamaHandler(BaseHTTPRequestHandler):
         self.server.requests.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
         request = self.server.requests[-1]
         if request["stream"] and request.get("tools") and len(self.server.requests) == 1:
-            body = (b'data: {"choices":[{"delta":{"content":"Checking files..."},"finish_reason":null}]}\n\n'
+            intro = (b'' if request["messages"][-1]["content"] == "Silent tool" else
+                     b'data: {"choices":[{"delta":{"content":"Checking files..."},"finish_reason":null}]}\n\n')
+            body = (intro +
                     b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"list_","arguments":"{\\"path\\":"}}]},"finish_reason":null}]}\n\n'
                     b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"files","arguments":"\\".\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n'
                     b'data: [DONE]\n\n')
@@ -130,9 +132,30 @@ class GgufTests(unittest.TestCase):
                                                lambda *_: True, lambda: None))
                 self.assertEqual(answer, "Done")
                 self.assertTrue(any(event.get("delta") == "Checking files..." for event in events))
+                self.assertTrue(any(event.get("activity") == "Running tool: list_files" for event in events))
                 self.assertEqual(server.requests[1]["messages"][-1]["tool_call_id"], "call-1")
                 self.assertEqual(server.requests[1]["messages"][-1]["role"], "tool")
                 self.assertNotIn("tool_name", server.requests[1]["messages"][-1])
+            finally:
+                engine.process = None
+                server.shutdown()
+                thread.join()
+
+    def test_silent_tool_call_reports_activity_without_text(self):
+        with ThreadingHTTPServer(("127.0.0.1", 0), FakeLlamaHandler) as server:
+            server.requests = []
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                engine = self.fake_engine(server)
+                events = []
+                engine.progress = events.append
+                response = engine.chat_agent([{"role": "user", "content": "Silent tool"}],
+                                             [{"type": "function", "function": {"name": "list_files"}}])
+                self.assertEqual(response.message.content, "")
+                self.assertEqual(response.message.tool_calls[0].function.name, "list_files")
+                self.assertTrue(any(event.get("activity") == "Preparing tool request" for event in events))
+                self.assertEqual(events[-1]["phase"], "tool")
             finally:
                 engine.process = None
                 server.shutdown()
