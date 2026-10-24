@@ -274,13 +274,13 @@ class GgufEngine:
 
     def chat_agent(self, messages, tools):
         """Stream OpenAI-compatible text and assemble indexed tool-call fragments."""
-        self.notify("generating", text="", started_at=time.time(), generated_tokens=0)
+        self.notify("generating", text="", activity="", started_at=time.time(), generated_tokens=0)
         parts, fragments = [], {}
-        size, finish, done = 0, None, False
+        size, finish, done, tool_streaming = 0, None, False, False
         try:
             with self._request(messages, tools=tools, stream=True) as response:
                 for line in response:
-                    self.notify("generating")
+                    self.notify("tool" if tool_streaming else "generating")
                     if not line.startswith(b"data: "):
                         continue
                     raw = line[6:].strip()
@@ -296,8 +296,11 @@ class GgufEngine:
                         if size > self.settings.max_tokens * 32:
                             raise GenerationError("Agent response exceeded the output size limit.")
                         parts.append(content)
-                        self.notify("generating", delta=content)
+                        self.notify("tool" if tool_streaming else "generating", delta=content)
                     for item in delta.get("tool_calls") or []:
+                        if not tool_streaming:
+                            tool_streaming = True
+                            self.notify("tool", activity="Preparing tool request")
                         slot = fragments.setdefault(item.get("index", 0), {"id": "", "type": "function",
                             "function": {"name": "", "arguments": ""}})
                         slot["id"] += item.get("id") or ""
@@ -314,7 +317,10 @@ class GgufEngine:
                 name=item["function"]["name"], arguments=item["function"]["arguments"]))
                      for item in raw_calls]
             raw_message = {"role": "assistant", "content": content, "tool_calls": raw_calls}
-            self.notify("generated")
+            if raw_calls:
+                self.notify("tool", activity="Tool request ready")
+            else:
+                self.notify("generated")
             return SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=calls,
                                                          raw=raw_message))
         except (ModelError, GenerationError):

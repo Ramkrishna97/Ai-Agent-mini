@@ -124,7 +124,7 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result, [False])
         self.assertIsNone(state.snapshot()["pending_tool"])
 
-    def test_allow_always_is_scoped_to_tool_and_conversation(self):
+    def test_allow_always_covers_all_tools_in_this_conversation(self):
         state = JobState()
         state.data["status"] = "running"
         results = []
@@ -138,34 +138,25 @@ class AgentTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertIsNotNone(pending)
         self.assertFalse(state.approve("wrong", True, always=True))
-        self.assertEqual(state.snapshot()["always_allowed_tools"], [])
+        self.assertFalse(state.snapshot()["always_allow_all"])
         self.assertTrue(state.approve(pending["id"], True, always=True))
         worker.join(2)
         self.assertEqual(results, [True])
-        self.assertEqual(state.snapshot()["always_allowed_tools"], ["run_command"])
+        self.assertTrue(state.snapshot()["always_allow_all"])
         self.assertTrue(state.await_approval("run_command", {"command": "Write-Output different"}))
         self.assertIsNone(state.snapshot()["pending_tool"])
-
-        other = threading.Thread(target=lambda: results.append(state.await_approval("write_file", {"path": "x"})))
-        other.start()
-        for _ in range(50):
-            pending = state.snapshot()["pending_tool"]
-            if pending:
-                break
-            time.sleep(0.01)
-        self.assertEqual(pending["name"], "write_file")
-        self.assertTrue(state.approve(pending["id"], False))
-        other.join(2)
-        self.assertEqual(results, [True, False])
+        for name in ("write_file", "web_fetch", "browser", "mcp_local_search"):
+            self.assertTrue(state.await_approval(name, {"path": "x"}))
+            self.assertIsNone(state.snapshot()["pending_tool"])
 
         restored = JobState()
         restored.restore({"data": state.snapshot(), "settings": None})
-        self.assertTrue(restored.await_approval("run_command", {"command": "Write-Output after-restart"}))
-        self.assertEqual(JobState().snapshot()["always_allowed_tools"], [])
+        self.assertTrue(restored.await_approval("browser", {"action": "navigate"}))
+        self.assertFalse(JobState().snapshot()["always_allow_all"])
 
     def test_allow_always_does_not_override_cancellation(self):
         state = JobState()
-        state.data["always_allowed_tools"].append("run_command")
+        state.data["always_allow_all"] = True
         state.cancel_event.set()
         from config import WorkflowCancelled
         with self.assertRaises(WorkflowCancelled):

@@ -190,7 +190,7 @@ class OllamaEngine:
 
     def chat_agent(self, messages, tools):
         """Stream visible answer text while retaining tool calls for the next turn."""
-        self.notify("generating", text="", started_at=time.time(), generated_tokens=0)
+        self.notify("generating", text="", activity="", started_at=time.time(), generated_tokens=0)
         parts, calls, size, final = [], [], 0, None
         try:
             stream = self.client.chat(model=self.settings.model_name, messages=messages, tools=tools,
@@ -199,7 +199,7 @@ class OllamaEngine:
                     "num_ctx": self.settings.context_tokens})
             try:
                 for chunk in stream:
-                    self.notify("generating")
+                    self.notify("tool" if calls else "generating")
                     final = chunk
                     content = chunk.message.content or ""
                     if content:
@@ -207,8 +207,11 @@ class OllamaEngine:
                         if size > self.settings.max_tokens * 32:
                             raise GenerationError("Agent response exceeded the output size limit.")
                         parts.append(content)
-                        self.notify("generating", delta=content)
-                    calls.extend(getattr(chunk.message, "tool_calls", None) or [])
+                        self.notify("tool" if calls else "generating", delta=content)
+                    incoming_calls = getattr(chunk.message, "tool_calls", None) or []
+                    if incoming_calls and not calls:
+                        self.notify("tool", activity="Preparing tool request")
+                    calls.extend(incoming_calls)
                 if final is None or not final.done:
                     raise GenerationError("Agent response stream ended before completion.")
                 if getattr(final, "done_reason", None) == "length":
@@ -218,7 +221,8 @@ class OllamaEngine:
                 if close:
                     close()
             content = "".join(parts)
-            self.notify("generated", generated_tokens=getattr(final, "eval_count", None))
+            self.notify("tool" if calls else "generated", generated_tokens=getattr(final, "eval_count", None),
+                        activity="Tool request ready" if calls else "")
             raw = {"role": "assistant", "content": content,
                    "tool_calls": [call.model_dump(exclude_none=True) for call in calls]}
             return SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=calls, raw=raw))

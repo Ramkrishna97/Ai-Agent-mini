@@ -5,7 +5,8 @@ GGUF model loaded directly through llama.cpp.
 Python owns every path, backup, validation, retry, and write decision. The model receives
 one system message and a bounded task/source message per call, without history, tools,
 or an autonomous agent loop in the default workflow. Agent mode is a separate,
-opt-in tool loop; it can execute code only after you approve each proposed action.
+opt-in tool loop; it can execute code after you approve a request or choose
+**Always allow this chat**.
 
 The browser UI uses one continuous chat column with the composer below the
 conversation, plus a Code/Text viewer and activity log in the same flow. Both
@@ -18,7 +19,7 @@ files, attached read-only references, public URLs, and recent conversation as
 context. Ordinary follow-up questions are read-only. To run a literal command in
 the same conversation, send `/run your-command`; the app shows its real exit code
 and output. For model-selected actions, enable **Agent mode** in Settings: each
-tool call requires separate approval. A fenced `tool_code` block in model text
+tool calls ask for approval until you choose **Always allow this chat**. A fenced `tool_code` block in model text
 is not a tool call and is never executed. The selected model stays loaded for follow-ups
 until a new task begins. The conversation survives a browser refresh while the
 local app process remains open.
@@ -43,10 +44,11 @@ Ollama or GGUF model, then check **Agent mode**. Describe the task normally
 (for example, "inspect this project, fix the failing test, and run it"). The model
 may request `list_files`, `read_file`, `write_file`, `run_command`, and
 `web_fetch` for public pages or GitHub repository README/metadata. The UI shows
-the exact tool name and arguments and waits for **Allow once**, **Allow always**, or **Deny**.
-**Allow always** skips future prompts for that tool type in this conversation, including
-commands with different arguments; it is saved with the conversation and does not apply
-to new conversations or other tool types. Files may be absolute or relative to the selected workspace; review absolute
+the tool name and lets you expand its arguments before choosing **Allow once**,
+**Always allow this chat**, or **Deny**. Always allow covers every later tool call
+in this conversation, including files, commands, browser access, and enabled MCP
+tools. The choice is saved with this conversation; new conversations ask again.
+Files may be absolute or relative to the selected workspace; review absolute
 paths before approval. File writes are limited to 64 KB and back up existing files.
 Public URLs explicitly included in an Agent request are also read as task context,
 so a small model can summarize a linked repository even if it does not make a
@@ -73,7 +75,7 @@ before using those tools. To add external MCP plugins, copy
 [mcp_servers.example.json](./mcp_servers.example.json) to `mcp_servers.json` and
 replace the example command with your MCP stdio server's command, arguments and
 optional environment. Configured servers start alongside the built-in search;
-each MCP tool call still needs separate approval. MCP servers run as local programs,
+MCP tool calls use the conversation's approval setting. MCP servers run as local programs,
 so configure only ones you trust. Keep credentials in local environment values and
 do not commit `mcp_servers.json` if it contains secrets. The browser and MCP options
 are off by default. The original deterministic workflow remains the default.

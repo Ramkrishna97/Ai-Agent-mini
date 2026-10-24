@@ -264,12 +264,12 @@ function schedulePreview() {
   const revision = ++previewRevision;
   preview = null;
   updateControls();
-  $('#count').textContent = `${instruction.value.length} / 4000`;
+  updateComposerLimits();
   if (followupMode) {
     preview = {needs_model: false};
     $('#preview').textContent = instruction.value.trim().startsWith('/run ') ?
       'Your explicit /run command will execute in this workspace; output appears in Activity and the conversation.' :
-      $('#agent-mode').checked ? 'Agent follow-up: tool requests require your approval.' :
+      $('#agent-mode').checked ? 'Agent follow-up: tool requests use this chat’s approval setting.' :
       'Read-only follow-up. Use /run for an explicit command or enable Agent mode for approved tools.';
     $('#preview-details').open = false;
     $('#preview-details').hidden = true;
@@ -290,7 +290,7 @@ function schedulePreview() {
       if (revision !== previewRevision) return;
       preview = result;
       const lines = [];
-      if (result.action === 'agent') lines.push('Agent mode: model may request local tools; approve each call below.');
+      if (result.action === 'agent') lines.push('Agent mode: model may request local tools; Always allow applies to this chat.');
       if (result.project) lines.push(`Generate project: ${result.project}`);
       for (const file of result.files) lines.push(`${file.action === 'edit' ? 'Back up and edit' : 'Create'}: ${file.path}`);
       for (const directory of result.directories) lines.push(`Create folder: ${directory}`);
@@ -306,6 +306,14 @@ function schedulePreview() {
     updateControls();
   }, 350);
 }
+
+function updateComposerLimits() {
+  const context = Number($('#context_tokens').value).toLocaleString();
+  const output = Number($('#max_tokens').value).toLocaleString();
+  $('#count').textContent = `${instruction.value.length} / ${instruction.maxLength} characters · Context ${context} tokens · Output ${output} tokens`;
+}
+
+for (const id of ['#context_tokens', '#max_tokens']) $(id).addEventListener('input', updateComposerLimits);
 
 instruction.addEventListener('input', schedulePreview);
 instruction.addEventListener('input', () => { scheduleCompletions(); });
@@ -790,6 +798,7 @@ function render(data) {
     if (data.temperature != null) $('#temperature').value = data.temperature;
     if (data.max_tokens != null) $('#max_tokens').value = data.max_tokens;
     if (data.context_tokens != null) $('#context_tokens').value = data.context_tokens;
+    updateComposerLimits();
     if (data.path) pathInput.value = data.path;
     if (data.provider === 'ollama' && modelsLoaded && modelSelect.options.length) modelSelect.value = preferredModel;
   }
@@ -845,10 +854,10 @@ function render(data) {
   if (pending) {
     $('#tool-name').textContent = pending.name;
     $('#tool-arguments').textContent = JSON.stringify(pending.arguments, null, 2);
-    $('#always-scope').textContent = `Allow always trusts future ${pending.name} requests in this conversation, even when their arguments change. New conversations ask again.`;
+    $('#always-scope').textContent = 'Always allow approves every future tool request in this chat, including file changes, commands, browser access, and enabled MCP tools. New chats ask again.';
     if (pendingToolId !== previousPendingId) {
-      for (const panel of [settingsPanel, activityDialog, helpPanel]) if (panel.open) panel.close();
-      requestAnimationFrame(() => $('#tool-approval').scrollIntoView({block: 'center'}));
+      $('#tool-details').open = false;
+      requestAnimationFrame(() => $('#tool-approval').scrollIntoView({block: 'nearest'}));
     }
   }
   $('#agent-result').hidden = true;

@@ -64,18 +64,30 @@ async def run_agent(workspace: Path, instruction: str, settings, engine, approve
                     args = {}
                 if name not in {tool["function"]["name"] for tool in runtime.tools}:
                     result = f"Tool unavailable: {name}"
-                elif not await asyncio.to_thread(approve, name, args):
-                    result = "Denied by user. Do not retry this action without a new request."
-                    LOG.info("Tool denied: %s", name)
+                    activity = f"Tool unavailable: {name}"
                 else:
-                    try:
-                        result = await runtime.call(name, args)
-                        LOG.info("Tool finished: %s", name)
-                    except WorkflowCancelled:
-                        raise
-                    except Exception as exc:
-                        result = f"Tool error: {describe_error(exc)}"
-                        LOG.warning("Tool failed: %s: %s", name, describe_error(exc))
+                    if hasattr(engine, "notify"):
+                        engine.notify("tool", activity=f"Waiting for approval: {name}")
+                    allowed = await asyncio.to_thread(approve, name, args)
+                    if not allowed:
+                        result = "Denied by user. Do not retry this action without a new request."
+                        activity = f"Tool denied: {name}"
+                        LOG.info("Tool denied: %s", name)
+                    else:
+                        try:
+                            if hasattr(engine, "notify"):
+                                engine.notify("tool", activity=f"Running tool: {name}")
+                            result = await runtime.call(name, args)
+                            activity = f"Tool finished: {name}"
+                            LOG.info("Tool finished: %s", name)
+                        except WorkflowCancelled:
+                            raise
+                        except Exception as exc:
+                            result = f"Tool error: {describe_error(exc)}"
+                            activity = f"Tool failed: {name}"
+                            LOG.warning("Tool failed: %s: %s", name, describe_error(exc))
+                if hasattr(engine, "notify"):
+                    engine.notify("tool", activity=activity)
                 tool_message = {"role": "tool", "tool_name": name, "content": str(result)[:16000]}
                 if getattr(call, "id", None):
                     tool_message["tool_call_id"] = call.id

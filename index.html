@@ -41,7 +41,7 @@
             <div id="ollama-picker"><label for="model">Choose an installed Ollama model</label><div class="picker"><select id="model" name="model" required><option value="">Loading installed models…</option></select><button id="refresh-models" class="secondary" type="button" aria-label="Refresh installed models">Refresh</button></div><p id="model-hint" class="hint" role="status">Discovering the models available in your local Ollama installation.</p><button id="offload-model" class="secondary" type="button">Offload loaded model</button><p id="model-preload" class="hint" role="status">No model loaded by this app.</p></div>
             <div id="gguf-picker" hidden><label for="gguf-path">GGUF model file</label><input id="gguf-path" readonly placeholder="Select a .gguf file on this computer"><button id="choose-gguf" class="secondary" type="button">Choose GGUF file…</button><p class="hint">The app starts a local llama.cpp runtime automatically. On Windows, its official CPU build downloads once if needed; later runs work offline.</p></div>
             <label class="agent-option"><input id="agent-mode" type="checkbox"> Agent mode: let the model request tools</label>
-            <p class="hint">Each tool type asks for approval until you choose Allow always for this conversation. The model can inspect files, edit code, run PowerShell, and read public websites. Agent mode requires a workspace folder and a tool-capable model.</p>
+            <p class="hint">Always allow approves future tool requests in this conversation, including files, commands, browser access, and enabled MCP tools. New conversations ask again. Agent mode requires a workspace folder and a tool-capable model.</p>
             <div id="agent-options" hidden><label class="agent-option"><input id="browser-enabled" type="checkbox"> Enable headless browser tool</label><label class="agent-option"><input id="mcp-enabled" type="checkbox"> Enable MCP tools (built-in search and configured plugins)</label></div>
             <details><summary>Generation settings</summary><div class="settings"><div><label for="temperature">Temperature</label><input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" required></div><div><label for="context_tokens">Max input context tokens per request</label><input id="context_tokens" type="number" min="8192" max="262144" value="16384" required></div><div><label for="max_tokens">Max output tokens per request</label><input id="max_tokens" type="number" min="128" max="16384" value="4096" required></div></div><p class="hint">Context must fit the output limit plus the working prompt. Choose Ollama or a local GGUF. Commands and folder creation do not require a model.</p></details>
             </details>
@@ -57,13 +57,13 @@
             <ul id="attachment-list" class="attachment-list" aria-label="Attached reference files"></ul>
             <button id="new-task" class="text-button" type="button" hidden>Start a new task</button>
             <p id="followup-note" class="hint" hidden>Follow-ups can read attached files and public links. Use /run for a literal command, or enable Agent mode in Settings for approval-gated tools.</p>
-            <div class="field-heading"><span id="composer-hint" class="hint">Enter to send · Shift+Enter for a new line. Type / for commands or @ for output files.</span><span id="count" class="hint">0 / 4000</span></div>
+            <div class="field-heading"><span id="composer-hint" class="hint">Enter to send · Shift+Enter for a new line. Type / for commands or @ for output files.</span><span id="count" class="hint">0 / 4000 characters · Context 16,384 tokens · Output 4,096 tokens</span></div>
             <details id="preview-details" hidden><summary>Review planned actions</summary><div id="preview" class="notice" role="status" aria-live="polite">Enter a request to see the program's destination checks.</div></details>
             <button id="run" type="submit" disabled>Send task →</button>
           </fieldset>
         </form>
         <button id="cancel" class="cancel-button" type="button" hidden>Stop generating</button>
-        <section id="tool-approval" class="card" hidden aria-live="polite"><h3>Approve model tool request?</h3><p id="tool-name"></p><pre id="tool-arguments"></pre><p id="always-scope" class="hint"></p><div class="destination-buttons"><button id="approve-tool" type="button">Allow once</button><button id="approve-always" type="button">Allow always</button><button id="deny-tool" class="secondary" type="button">Deny</button></div></section>
+        <section id="tool-approval" class="card" hidden aria-live="polite"><h3>Approve model tool request?</h3><p id="tool-name"></p><details id="tool-details"><summary>View request details</summary><pre id="tool-arguments"></pre></details><p id="always-scope" class="hint"></p><div class="destination-buttons"><button id="approve-tool" type="button">Allow once</button><button id="approve-always" type="button">Always allow this chat</button><button id="deny-tool" class="secondary" type="button">Deny</button></div></section>
       </section>
       <aside>
         <details id="generation" class="card live-panel" hidden>
@@ -88,7 +88,7 @@
             <div id="result" hidden><h3>Backup saved</h3><p id="backup"></p></div>
           </details>
         </section>
-        <details class="help"><summary>Examples and tips</summary><h2>One request, any supported file types</h2><p>You can ask for an entire app in plain language. The project design supplies its filenames and extensions; there is no file-type selector. Java + Spring Boot + React requests use a program-defined mixed-file scaffold.</p><p>Agent mode lets a tool-capable model inspect files, run tests, use a headless browser, and call configured MCP servers. Every model-selected action needs your approval.</p><p>Type <strong>/</strong> for reserved commands or <strong>@</strong> to browse workspace files. Paths are relative to the workspace unless absolute.</p><pre>Build a CRUD app using Java, Spring Boot and React.
+        <details class="help"><summary>Examples and tips</summary><h2>One request, any supported file types</h2><p>You can ask for an entire app in plain language. The project design supplies its filenames and extensions; there is no file-type selector. Java + Spring Boot + React requests use a program-defined mixed-file scaffold.</p><p>Agent mode lets a tool-capable model inspect files, run tests, use a headless browser, and call configured MCP servers. Choose Always allow to approve future tool calls in this conversation.</p><p>Type <strong>/</strong> for reserved commands or <strong>@</strong> to browse workspace files. Paths are relative to the workspace unless absolute.</p><pre>Build a CRUD app using Java, Spring Boot and React.
 
 Improve @"src/app.py" and @"src/utils.py".
 
@@ -102,7 +102,7 @@ Build a calculator project with a CLI.
 /run Get-ChildItem</pre><p><strong>/file</strong> creates or edits automatically. <strong>/project</strong> generates up to 20 files. <strong>/mkdir</strong> creates folders. <strong>/run</strong> executes your literal PowerShell command. Recognized command lines such as <strong>wsl --status</strong> also run directly. Prefixes <strong>!</strong> and <strong>#</strong> work for reserved words.</p><p>Windows installation commands may require an elevated application window and a restart. In the default workflow the model never chooses commands; Agent mode permits them only with approval. Command side effects are separate from file rollback.</p><p>Double-click <strong>start.bat</strong> to launch everything next time.</p></details>
       </aside>
     </div>
-    <footer>Local workflow. Opt-in agent tools. You approve each tool action.</footer>
+    <footer>Local workflow. Opt-in agent tools. You control tool approval for each chat.</footer>
   </main>
 </body>
 </html>

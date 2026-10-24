@@ -13,20 +13,34 @@ from ui_server import Server, SessionStore
 
 
 class SessionStoreTests(unittest.TestCase):
+    def test_old_per_tool_approval_migrates_to_chat_scope(self):
+        with TemporaryDirectory() as folder:
+            store = SessionStore(folder)
+            session_id = store.create()
+            job = store.get(session_id)
+            job.data.pop("always_allow_all")
+            job.data["always_allowed_tools"] = ["write_file"]
+            job.persist()
+
+            reopened = SessionStore(folder).get(session_id)
+            self.assertTrue(reopened.snapshot()["always_allow_all"])
+            self.assertTrue(reopened.await_approval("browser", {"action": "navigate"}))
+
     def test_allow_always_survives_restart_only_in_its_conversation(self):
         with TemporaryDirectory() as folder:
             store = SessionStore(folder)
             approved_id = store.create()
             other_id = store.create()
             approved = store.get(approved_id)
-            approved.data["always_allowed_tools"].append("run_command")
+            approved.data["always_allow_all"] = True
             approved.persist()
             other = store.get(other_id)
             other.persist()
 
             reopened = SessionStore(folder)
-            self.assertEqual(reopened.get(approved_id).snapshot()["always_allowed_tools"], ["run_command"])
-            self.assertEqual(reopened.get(other_id).snapshot()["always_allowed_tools"], [])
+            self.assertTrue(reopened.get(approved_id).snapshot()["always_allow_all"])
+            self.assertFalse(reopened.get(other_id).snapshot()["always_allow_all"])
+            self.assertTrue(reopened.get(approved_id).await_approval("browser", {"action": "navigate"}))
 
     def test_allow_always_api_records_scope(self):
         with TemporaryDirectory() as folder, Server(("127.0.0.1", 0)) as server:
@@ -44,8 +58,7 @@ class SessionStoreTests(unittest.TestCase):
                     "X-Session-Id": session_id}, method="POST")
                 with urlopen(request, timeout=5) as response:
                     self.assertEqual(response.status, 200)
-                self.assertEqual(SessionStore(folder).get(session_id).snapshot()["always_allowed_tools"],
-                                 ["run_command"])
+                self.assertTrue(SessionStore(folder).get(session_id).snapshot()["always_allow_all"])
             finally:
                 server.shutdown()
                 worker.join(5)

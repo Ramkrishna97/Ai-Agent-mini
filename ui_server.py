@@ -71,7 +71,7 @@ class JobState:
         self.approval_decision = False
         self.data = {"status": "idle", "logs": [], "backup": "", "backups": [], "files": [],
                      "commands": [], "error": "", "path": "", "mode": "auto", "generation": {},
-                     "pending_tool": None, "always_allowed_tools": [], "answer": "", "conversation": [], "chat_ready": False}
+                     "pending_tool": None, "always_allow_all": False, "answer": "", "conversation": [], "chat_ready": False}
         self.chat_settings = None
         self.completed_context = None
         self.active_engine = None
@@ -85,7 +85,8 @@ class JobState:
     def restore(self, record):
         with self.lock:
             self.data = record["data"]
-            self.data.setdefault("always_allowed_tools", [])
+            legacy_approval = bool(self.data.pop("always_allowed_tools", []))
+            self.data["always_allow_all"] = bool(self.data.get("always_allow_all") or legacy_approval)
             saved = record.get("settings")
             self.chat_settings = Settings(**saved) if saved else None
             self.completed_context = record.get("completed_context")
@@ -101,7 +102,6 @@ class JobState:
     def snapshot(self):
         with self.lock:
             return {**self.data, "logs": list(self.data["logs"]),
-                    "always_allowed_tools": list(self.data.get("always_allowed_tools", [])),
                     "generation": dict(self.data.get("generation", {})),
                     "conversation": [dict(item) for item in self.data.get("conversation", [])]}
 
@@ -135,8 +135,8 @@ class JobState:
             if not pending or pending["id"] != request_id or self.approval_event.is_set():
                 return False
             self.approval_decision = allowed
-            if allowed and always and pending["name"] not in self.data["always_allowed_tools"]:
-                self.data["always_allowed_tools"].append(pending["name"])
+            if allowed and always:
+                self.data["always_allow_all"] = True
             self.approval_event.set()
             return True
 
@@ -144,7 +144,7 @@ class JobState:
         self.check_cancelled()
         request_id = secrets.token_urlsafe(16)
         with self.lock:
-            auto_approved = name in self.data.get("always_allowed_tools", [])
+            auto_approved = self.data.get("always_allow_all", False)
             if not auto_approved:
                 self.approval_decision = False
                 self.approval_event.clear()
@@ -173,7 +173,7 @@ class JobState:
             self.completed_context = None
             self.data = {"status": "running", "logs": [], "backup": "", "backups": [], "files": [],
                          "commands": [], "error": "", "path": path, "mode": "agent" if agent_mode else plan.action, "generation": {},
-                         "pending_tool": None, "always_allowed_tools": [], "answer": "",
+                         "pending_tool": None, "always_allow_all": self.data.get("always_allow_all", False), "answer": "",
                          "request": instruction, "model": settings.model_name if settings else "",
                          "provider": settings.provider if settings else "", "agent_mode": agent_mode,
                          "browser": browser, "mcp": mcp,
